@@ -1,0 +1,43 @@
+from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class Categorie(Base):
+    __tablename__ = "produitCategorieTemp"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    idProduit = Column(Integer, nullable=False)
+    nomCategorie = Column(String(400), nullable=True)
+    nomCategorieEN = Column(String(400), nullable=True)
+    description = Column(String(400), nullable=True)
+    descriptionEN = Column(String(400), nullable=True)
+    codeCategorie = Column(String(400), nullable=True)
+    prixAppel = Column(Boolean, nullable=True)
+    totalMax = Column(Integer, nullable=True)
+    adulteMax = Column(Integer, nullable=True)
+    adulteMin = Column(Integer, nullable=True)
+    enfantMax = Column(Integer, nullable=True)
+    enfantMin = Column(Integer, nullable=True)
+    bebeConsidereCommePax = Column(Boolean, nullable=True)
+    unite = Column(Integer, nullable=True)
+    idsLangue = Column(String(30), nullable=True)
+    ordre = Column(Integer, nullable=True)
+    delaiMinResaAvantDepart = Column(Integer, nullable=True)
+    idTypeService = Column(Integer, nullable=True)
+    idGammeService = Column(Integer, nullable=True)
+    idTypeVehicule = Column(Integer, nullable=True)
+    idTypeTrajet = Column(Integer, nullable=True)
+    idLocaliteDepart = Column(Integer, nullable=True)
+    idLocaliteArrivee = Column(Integer, nullable=True)
+    trajetSimple = Column(Boolean, nullable=False)
+    incomingCodeHotelbeds = Column(String(30), nullable=True)
+    contactNameHotelbeds = Column(String(100), nullable=True)
+    suspendu = Column(Boolean, nullable=False)
+    nomCategoriePT = Column(String(400), nullable=True)
+    descriptionPT = Column(String(400), nullable=True)
+    idTourCms = Column(Integer, nullable=True)
+    tauxRemiseFournisseur = Column(Integer, nullable=True)
+    startTime = Column(String(100), nullable=True)
+    endTime = Column(String(100), nullable=True)
+    idOdoo = Column(Integer, nullable=True)
