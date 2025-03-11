@@ -39,6 +39,6 @@ def get_all_remote_id(db : Session):
         .query(Produit)
         .filter(Produit.idFournisseur == 778)
         .with_entities(Produit.referenceExterne)
-        .limit(5)
+        .limit(1)
         .all()
     )

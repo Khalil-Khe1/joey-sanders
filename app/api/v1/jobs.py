@@ -26,6 +26,7 @@ async def availability(product_id : int, db : Session = Depends(get_db)):
     list_tarifs = []
 
     ref_produit = ref_produit[0].replace('p', '')
+    ref_produit = '977245'
 
     headers = {
         'Authorization': 'Token OmpSeEXpj5jITovEfjslUzxAx8r7Vt61',
@@ -87,9 +88,14 @@ async def availability(product_id : int, db : Session = Depends(get_db)):
 
 @router.get('/availability-all')
 async def availability_all(db : Session = Depends(get_db)):
+    import random
+    from datetime import datetime
+    random.seed(datetime.now().timestamp())
+
     list_results = []
 
     ref_list = produit_services.get_all_remote_id(db)
+    #ref_list = random.sample(ref_list, 20)
     for i, ref in enumerate(ref_list):
         list_results.append(await availability(ref, db))
     
