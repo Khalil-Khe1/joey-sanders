@@ -42,6 +42,20 @@ def process_category(variants : list,
     price_variants : list):
     import math
 
+    list_categories = []
+    current = {
+        'categorie': '###',
+        'temps': time,
+        'zone': timezone,
+        'date_debut': date,
+        'date_fin': date,
+        'achat_adulte': 0,
+        'recommande_adulte': 0,
+        'achat_enfant': 0,
+        'recommande_enfant': 0,
+        'devise': 'EUR'    
+    }
+
     selected_variants = list(filter(lambda e: group['id'] in e['group_ids'], variants)) # Find variants in group
 
     #group_name = group_name if not time else f'{group_name} - {time.replace(":", "h")} {timezone}'
@@ -50,14 +64,13 @@ def process_category(variants : list,
     adult_purchase = 0
     child_ticket = 0
     child_purchase = 0
-    group_name = ''
-    for selected_variant in selected_variants:
-        print(clean_group_name(group['name'])) # Clean redundancies
 
+    group_name = None
+    list_names = []
+    for selected_variant in selected_variants:
         if selected_variant['languages'] not in [['en'], ['fr'], ['en', 'fr'], []]:
             continue
 
-        filtered = list(filter(lambda e: e['id'] == selected_variant['id'], price_variants)) # Find variants in timeslots
         selected_price = None
         for pricev in price_variants:
             if(selected_variant['id'] == pricev['id']):
@@ -65,29 +78,36 @@ def process_category(variants : list,
         if not selected_price:
             continue
 
-        group_name = parse_group_and_label(
-            clean_group_name(group['name']), 
-            clean_label(selected_variant['label'])
-        )
+        group_name = parse_group_and_label(clean_group_name(group['name']), clean_label(selected_variant['label']))
+        if group_name != current['categorie']:
+            if current['categorie'] != '###':
+                list_categories.append(current)
+                current = {
+                    'categorie': 'awaiting_new_name',
+                    'temps': time,
+                    'zone': timezone,
+                    'date_debut': date,
+                    'date_fin': date,
+                    'achat_adulte': 0,
+                    'recommande_adulte': 0,
+                    'achat_enfant': 0,
+                    'recommande_enfant': 0,
+                    'devise': 'EUR'    
+                }
+            current['categorie'] = group_name
+
         if(selected_variant['variant_type'].lower() == 'adult'):
-            adult_ticket = selected_price['price_mediation']['sale_ticket_value_incl_vat']
-            adult_purchase = adult_ticket - selected_price['price_mediation']['distributor_commission_excl_vat']
+            current['recommande_adulte'] = selected_price['price_mediation']['total_retail_price_incl_vat']
+            current['achat_adulte'] = (
+                current['recommande_adulte'] - selected_price['price_mediation']['distributor_commission_excl_vat']
+            )
         elif(selected_variant['variant_type'].lower() == 'child'):
-            child_ticket = selected_price['price_mediation']['total_retail_price_incl_vat']
-            child_purchase = child_ticket - selected_price['price_mediation']['distributor_commission_excl_vat']
-    
-    return {
-        'categorie': group_name,
-        'temps': time,
-        'zone': timezone,
-        'date_debut': date,
-        'date_fin': date,
-        'achat_adulte': adult_purchase,
-        'recommande_adulte': adult_ticket,
-        'achat_enfant': child_purchase,
-        'recommande_enfant': child_ticket,
-        'devise': 'EUR'    
-    }
+            current['recommande_enfant'] = selected_price['price_mediation']['total_retail_price_incl_vat']
+            current['achat_enfant'] = (
+                current['recommande_adulte'] - selected_price['price_mediation']['distributor_commission_excl_vat']
+            )
+
+    return list_categories.__add__([current]) if group_name else None
 
 def create_category(
     variants : list, 
@@ -99,42 +119,50 @@ def create_category(
     categories = []
     time = time.replace(':', 'h')
 
+    #groups = clean_groups(groups)
     for group in groups:
-        category = process_category(variants, group, time, timezone, date, price_variants)
-        categories.append(category)
+        returned_categories = process_category(variants, group, time, timezone, date, price_variants)
+        if returned_categories:
+            categories.extend(returned_categories)
 
     return categories
 
 def timegroup_categories(categories, time):
-    #time = '14h00'
-    res = []
+    arr = []
     for day in categories:
         for tarif in day:
             if time == tarif['temps']:
-                res.append(tarif)
-                break
-    for item in res:
-        if item['achat_enfant'] > 0:
-            pass
+                arr.append(tarif)
+    res = {}
+    for item in arr:
+        if item['categorie'] not in res:
+            res[item['categorie']] = []
+        res[item['categorie']].append(item)
+    
     return res
 
 def process_cleaning(categories, time):
-    local_res = []
+    res = []
     compare_keys = ['categorie', 'achat_adulte', 'recommande_adulte', 'achat_enfant', 'recommande_enfant']
 
     selected = timegroup_categories(categories, time)
-    size = len(selected)
-    if(size > 0):
-        local_res.append(selected[0])
-    i = 1
-    while i < size:
-        current = selected[i]
-        if any(local_res[-1][key] != current[key] for key in compare_keys):
-            local_res.append(current)
-        if all(local_res[-1][key] == current[key] for key in compare_keys):
-            local_res[-1]['date_fin'] = current['date_fin']
-        i = i + 1
-    return local_res
+    for value in selected.values():
+        local_res = []
+        size = len(value)
+        if(size > 0):
+            local_res.append(value[0])
+        i = 1
+        while i < size:
+            current = value[i]
+            if any(local_res[-1][key] != current[key] for key in compare_keys):
+                local_res.append(current)
+            if all(local_res[-1][key] == current[key] for key in compare_keys):
+                local_res[-1]['date_fin'] = current['date_fin']
+            i = i + 1
+        res = res + local_res
+    if time == '14h00':
+        print(res)
+    return res
 
 def clean_categories(categories):
     res = []
@@ -150,4 +178,47 @@ def clean_categories(categories):
     res = res + process_cleaning(categories, 'whole_day')
     return res
 
+def tarif_workflow(groups : list, variants : list, dates : list):
+    categories = []
 
+    for date in dates:
+        for timeslot in date['timeslots']:
+            tarifs = create_category(
+                variants,
+                groups,
+                timeslot['time'],
+                timeslot['timezone'],
+                date['date'],
+                timeslot['variants']
+            )
+            if not tarifs:
+                continue
+            categories.append(tarifs)
+    return clean_categories(categories)
+
+def extract_categories(tarifs : list):
+    local_categs = []
+    for item in tarifs:
+        local_categs.append(f'{item["categorie"]}{" - " + item["temps"] if item["temps"] != "whole_day" else ""}')
+    return list(set(local_categs))
+
+
+# Experimental
+def clean_groups(groups : list): # For segmenting multuple occurences
+    occurences = {}
+    new_groups = []
+
+    for group in groups:
+        clean_name = clean_group_name(group['name'])
+        occurences[clean_name] = sum(1 for grp in groups if clean_group_name(grp['name']) == clean_name)
+        occurences[clean_name] = occurences[clean_name] if occurences[clean_name] > 1 else 0
+
+    for group in groups:
+        clean_name = clean_group_name(group['name'])
+        generated = {
+            'id': group['id'],
+            'name': clean_name + ('' if occurences[clean_name] == 0 else f' {str(occurences[clean_name])}')
+        }
+        occurences[clean_name] = occurences[clean_name] - 1
+        new_groups.append(generated)
+    return new_groups

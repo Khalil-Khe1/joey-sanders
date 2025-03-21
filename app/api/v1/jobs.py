@@ -26,7 +26,7 @@ async def availability(product_id : int, db : Session = Depends(get_db)):
     list_tarifs = []
 
     ref_produit = ref_produit[0].replace('p', '')
-    ref_produit = '977245'
+    ref_produit = '1042894'
 
     headers = {
         'Authorization': 'Token OmpSeEXpj5jITovEfjslUzxAx8r7Vt61',
@@ -62,26 +62,8 @@ async def availability(product_id : int, db : Session = Depends(get_db)):
 
     dates = response['dates']
 
-    categories = []
-
-    for date in dates:
-        for timeslot in date['timeslots']:
-            tarifs = tarif_utils.create_category(
-                variants,
-                groups,
-                timeslot['time'],
-                timeslot['timezone'],
-                date['date'],
-                timeslot['variants']
-            )
-            if not tarifs:
-                continue
-            categories.append(tarifs)
-    list_tarifs = list_tarifs + tarif_utils.clean_categories(categories)
-    local_categs = []
-    for item in list_tarifs:
-        local_categs.append(f'{item["categorie"]}{" - " + item["temps"] if item["temps"] != "whole_day" else ""}')
-    list_categories = list(set(list_categories + local_categs))
+    list_tarifs = tarif_utils.tarif_workflow(groups, variants, dates)
+    list_categories = tarif_utils.extract_categories(list_tarifs)
     print(ref_produit)
 
     return {'id': ref_produit, 'categories': list_categories, "tarifs": list_tarifs}
