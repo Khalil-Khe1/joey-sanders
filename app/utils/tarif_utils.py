@@ -70,6 +70,8 @@ def process_category(variants : list,
     for selected_variant in selected_variants:
         if selected_variant['languages'] not in [['en'], ['fr'], ['en', 'fr'], []]:
             continue
+        if selected_variant['variant_type'].lower() not in ['adult', 'child']:
+            continue
 
         selected_price = None
         for pricev in price_variants:
@@ -104,7 +106,7 @@ def process_category(variants : list,
         elif(selected_variant['variant_type'].lower() == 'child'):
             current['recommande_enfant'] = selected_price['price_mediation']['total_retail_price_incl_vat']
             current['achat_enfant'] = (
-                current['recommande_adulte'] - selected_price['price_mediation']['distributor_commission_excl_vat']
+                current['recommande_enfant'] - selected_price['price_mediation']['distributor_commission_excl_vat']
             )
 
     return list_categories.__add__([current]) if group_name else None
@@ -160,8 +162,6 @@ def process_cleaning(categories, time):
                 local_res[-1]['date_fin'] = current['date_fin']
             i = i + 1
         res = res + local_res
-    if time == '14h00':
-        print(res)
     return res
 
 def clean_categories(categories):

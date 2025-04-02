@@ -1,0 +1,3 @@
+PRODUCT_COMPARE = ['title', 'summary']
+CATEGORY_COMPARE = []
+TARIF_COMPARE = []

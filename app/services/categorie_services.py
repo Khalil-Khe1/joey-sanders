@@ -1,52 +1,47 @@
 from sqlalchemy.orm import Session
+
 from app.models.categorie import Categorie
+from app.services.crud import CRUD
+
 from sqlalchemy import and_
+import datetime
 
-def get_item(db, **kwargs):
-    filters = []
-    for key, value in kwargs.items():
-        if hasattr(Categorie, key):
-            filters.append(getattr(Categorie, key) == value)
+from app.utils import tiqets_api
 
-    return db.query(Categorie).filter(and_(*filters)).first()
+from app.utils.constants import CATEGORY_COMPARE
 
-""" def get_item(db: Session, idProduit : int, nomCategorie: str):
-    return db.query(Categorie).filter """
+class CategoryServices(CRUD):
+    def __init__(self):
+        self.model = Categorie
+        self.insert_queue = []
+        self.update_queue = []
 
-def get_all(db: Session):
-    return (
-        db
-        .query(Categorie)
-        .limit(5)
-        .all()
-    )
-    #.with_entities(Categorie.id, Categorie.referenceExterne, Categorie.nom, Categorie.nomEN, Categorie.description)
-
-def get_all_fields(db : Session):
-    return (
-        db
-        .query(Categorie)
-        .filter(Categorie.idFournisseur == 778)
-        .with_entities(Categorie.id)
-        .limit(5)
-        .all()
-    )
-
-def create(session: Session, **kwargs):
-    categorie = Categorie(**kwargs)
-    session.add(categorie)
-    session.commit()
-    session.refresh(categorie) 
-    return categorie
-
-def update(session: Session, categorie_id: int, **kwargs):
-    categorie = session.query(Categorie).filter_by(id=categorie_id).first()
-    if not categorie:
-        return None
-    for key, value in kwargs.items():
-        if hasattr(categorie, key):
-            setattr(categorie, key, value)
-    categorie.dateModification = datetime.utcnow()
-    session.commit()
-    session.refresh(categorie)
-    return categorie
+    def queue_from_availability(self, db: Session, product_id: int, available_categories: list):    
+        whitelist, update_queue, insert_queue = [], [], []
+        list_categ = self.read_all_kwargs(db, product_id=product_id)
+        for categ in list_categ:
+            if categ.nomCategorie in available_categories:
+                whitelist.append(categ.nomCategorie)
+                if categ.suspendu == 1:
+                    update_queue.append({
+                    'id': categ.id, 
+                    'suspendu': 0, 
+                    'dateModification': datetime.datetime.now()
+                })
+            else:
+                update_queue.append({
+                    'id': categ.id, 
+                    'suspendu': 1, 
+                    'dateModification': datetime.datetime.now()
+                })
+        new = list(set(available_categories) - set(whitelist))
+        for item in new:
+            insert_queue.append(Categorie(
+                idProduit=product_id, 
+                nomCategorie=item
+            ))
+        limit = 10 # Change 10 to 1000
+        limit = limit if len(self.insert_queue + self.update_queue) < limit else 1
+        inserted = self.queue_insert(db, insert_queue, limit)
+        updated = self.queue_update(db, update_queue, limit)
+        return inserted, updated

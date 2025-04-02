@@ -27,3 +27,6 @@ def patch_bulk_update(db : Session, update_ops):
     db.bulk_update_mappings(ProduitTemp, update_ops)
     db.commit()
     #db.close()
+
+def delete_all(db : Session):
+    db.query(ProduitTemp).delete()

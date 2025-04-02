@@ -6,8 +6,15 @@ import datetime
 
 from app.config import settings
 from app.database import get_db
-from app.services import categorie_services, produit_services, tarif_services
-from app.utils import tarif_utils
+
+from app.services.produit_services import ProductServices
+from app.services.categorie_services import CategoryServices
+from app.services.tarif_services import TarifServices
+
+from app.utils import (
+    tarif_utils, 
+    tiqets_api
+)
 
 from sqlalchemy.orm import Session
 
@@ -17,95 +24,96 @@ router = APIRouter()
 client = httpx.AsyncClient()
 
 @router.get('/availability')
-async def availability(product_id : int, db : Session = Depends(get_db)):
-    if product_id is None:
+async def availability(id_produit: int, ref_prod: str):
+    if ref_prod is None:
         return {'Error': 'Product ID not sepcified'}
 
-    ref_produit = product_id
+    print('AVAILABILITY BEGIN', ref_prod)
     list_categories = []
     list_tarifs = []
 
-    ref_produit = ref_produit[0].replace('p', '')
-    ref_produit = '1042894'
+    ref_prod = ref_prod.replace('p', '')
+    ref_prod = ref_prod.replace('b', '')
+    ref_prod = ref_prod.replace(' ', '')
 
-    headers = {
-        'Authorization': 'Token OmpSeEXpj5jITovEfjslUzxAx8r7Vt61',
-        'User-Agent': 'FastAPI/1.0',
-        'Accept': 'application/json',
-    }
-
-    query_params = {
-        'lang': 'fr',
-        'currency': 'EUR'
-    }
-    try:
-        response = await client.get(
-            f'https://api.tiqets.com/v2/products/{ref_produit}/product-variants', 
-            headers=headers, 
-            params=query_params
-        )
-        response.raise_for_status()
-        response = response.json()
-    except httpx.HTTPStatusError as e:
-        return {'Error': f'{e.response.status_code} - {e.response.text}'}
-
+    response = await tiqets_api.variants(ref_prod)
     groups = response['groups']
     variants = response['variants']
 
-    response = await client.get(
-        f'https://api.tiqets.com/v2/products/{ref_produit}/availability', 
-        headers=headers, 
-        params=query_params
-    )
-    response.raise_for_status()
-    response = response.json()
-
+    response = await tiqets_api.availability(ref_prod)
     dates = response['dates']
 
     list_tarifs = tarif_utils.tarif_workflow(groups, variants, dates)
     list_categories = tarif_utils.extract_categories(list_tarifs)
-    print(ref_produit)
+    print('AVAILABILITY END', ref_prod)
 
-    return {'id': ref_produit, 'categories': list_categories, "tarifs": list_tarifs}
+    return {'id': id_produit, 'categories': list_categories, "tarifs": list_tarifs}
 
 @router.get('/availability-all')
-async def availability_all(db : Session = Depends(get_db)):
+async def availability_all():
     import random
     from datetime import datetime
     random.seed(datetime.now().timestamp())
 
     list_results = []
 
-    ref_list = produit_services.get_all_remote_id(db)
+    service_prod = ProductServices()
+    ref_list = service_prod.get_all_remote_id(db)
     #ref_list = random.sample(ref_list, 20)
+    admitted = []
     for i, ref in enumerate(ref_list):
-        list_results.append(await availability(ref, db))
+        id_produit = ref.id
+        ref_prod: str = ref.referenceExterne
+        ref_prod = ref_prod.replace('p', '')
+        ref_prod = ref_prod.replace('b', '')
+        ref_prod = ref_prod.replace(' ', '')
+        if ref[0] not in admitted:
+            list_results.append(await availability(id_produit, ref_prod, db))
+            admitted.append(ref_prod)
+            if len(admitted) > 5:
+                break
     
     return list_results
 
 @router.post('/create-all-categories')
-async def create_all_categories(db : Session = Depends(get_db)):
-    list_categories = await availability_all(db)
+async def create_all_categories(db: Session = Depends(get_db)):
+    service_categ = CategoryServices()
+
+    list_categories = await availability_all()
     list_categories = list(filter(lambda e: 'Error' not in e.keys(), list_categories))
     for item in list_categories:
         for categ in item['categories']:
-            new_categ = categorie_services.create(
-                db,
+            service_categ.append_insert_queue_kwargs(
                 idProduit=int(item['id']),
-                nomCategorie=categ,
-                trajetSimple=1,
-                suspendu=0
-                )
+                nomCategorie=categ
+            )
+    db.add_all(service_categ.insert_queue)
+    db.commit()
     return {'Success': 'True'}
 
+@router.post('/create-all-categories/cron')
+async def create_all_categories(data: list, db: Session = Depends(get_db)):
+    service_categ = CategoryServices()
+
+    for item in data:
+        for categ in item['categories']:
+            service_categ.append_insert_queue_kwargs(
+                idProduit=int(item['id']),
+                nomCategorie=categ
+            )
+    service_categ.queue_insert(db, [], 1)
+    return {'success': 'True'}
+
 @router.post('/create-all-tarifs')
-async def create_all_tarifs(db : Session = Depends(get_db)):
-    list_availablity = await availability_all(db)
-    list_availablity = list(filter(lambda e: 'Error' not in e.keys(), list_availablity))
-    for item in list_availablity:
+async def create_all_tarifs(db: Session = Depends(get_db)):
+    data = await availability_all()
+    data = list(filter(lambda e: 'Error' not in e.keys(), data))
+    data = []
+    for item in data:
         for tarif in item['tarifs']:
             category_name = f'{tarif["categorie"]} - {tarif["temps"] if tarif["temps"] != "whole_day" else ""}'
-            category = categorie_services.get_item(db, idProduit=item['id'], nomCategorie=category_name)
+            service_categ = CategoryServices()
+            category = service_categ.read_kwargs(db, idProduit=item['id'], nomCategorie=category_name)
             if category is None: #Handle not found
                 continue
             
@@ -115,53 +123,77 @@ async def create_all_tarifs(db : Session = Depends(get_db)):
                 [tarif['recommande_adulte'], tarif['recommande_enfant']]
             ]
             for i in index: 
-                new_tarif = tarif_services.create(
-                    db,
+                data.append(Tarif(
                     idProduitCategorie=int(category.id),
                     idCodeTarif=1,
                     date=int(tarif['date_debut'].replace('-', '')),
                     dateFin=int(tarif['date_fin'].replace('-', '')),
                     vente=i,
-                    idDevise=403, # 403 = EUR
                     dateCreation=datetime.datetime.now(),
                     dateModification=datetime.datetime.now(),
                     prixBase=prices[i][0],
                     prixEnfant=prices[i][1]
-                    )
-    return {'Success': 'True'}
+                ))
+    db.add_all(data)
+    db.commit()
+    return {'success': 'True'}
+
+@router.post('/create-all-tarifs/cron')
+async def create_all_tarifs(data: list, db: Session = Depends(get_db)):
+    service_tarif = TarifServices()
+
+    data = list(filter(lambda e: 'Error' not in e.keys(), data))
+    for item in data:
+        for tarif in item['tarifs']:
+            category_name = f'{tarif["categorie"]} - {tarif["temps"] if tarif["temps"] != "whole_day" else ""}'
+            service_categ = CategoryServices()
+            category = service_categ.read_kwargs(db, idProduit=item['id'], nomCategorie=category_name)
+            if category is None: #Handle not found
+                continue
+            print('CREATE TARIF CATEG ID', category.id)
+            index = [0, 1]
+            prices = [
+                [tarif['achat_adulte'], tarif['achat_enfant']], 
+                [tarif['recommande_adulte'], tarif['recommande_enfant']]
+            ]
+            for i in index: 
+                service_tarif.append_insert_queue_kwargs(
+                    idProduitCategorie=int(category.id),
+                    idCodeTarif=1,
+                    date=int(tarif['date_debut'].replace('-', '')),
+                    dateFin=int(tarif['date_fin'].replace('-', '')),
+                    vente=i,
+                    dateCreation=datetime.datetime.now(),
+                    dateModification=datetime.datetime.now(),
+                    prixBase=prices[i][0],
+                    prixEnfant=prices[i][1]
+                )
+    service_tarif.queue_insert(db, [], 1)
+    return {'success': 'True'}
+
+@router.delete('/reset')
+def reset_tables(db: Session = Depends(get_db)):
+    service = CategoryServices()
+    service.delete_all(db)
+    service = TarifServices()
+    service.delete_all(db)
+    service = ProductServices()
+    service.delete_all(db)
+    return {'success': 'True'}
 
 @router.put('/find-group')
-async def find_group(db : Session = Depends(get_db)):
-    ref_list = produit_services.get_all_remote_id(db)
+async def find_group(db: Session = Depends(get_db)):
+    service_prod = ProductServices()
+    ref_list = service_prod.read_all_remote_id(db)
 
-    for ref_produit in ref_list:
-        ref_produit = ref_produit[0].replace('p', '')
-        if(ref_produit == ''):
+    for ref_prod in ref_list:
+        ref_prod = ref_prod[0].replace('p', '')
+        if(ref_prod == ''):
             print(f'empty')
             continue
         else:
-            headers = {
-                'Authorization': 'Token OmpSeEXpj5jITovEfjslUzxAx8r7Vt61',
-                'User-Agent': 'FastAPI/1.0',
-                'Accept': 'application/json',
-            }
-
-            query_params = {
-                'lang': 'fr',
-                'currency': 'EUR'
-            }
-
-            print('ref:',ref_produit)
-            response = await client.get(
-                f'https://api.tiqets.com/v2/products/{ref_produit}/product-variants', 
-                headers=headers, 
-                params=query_params
-            )
-            response.raise_for_status()
-            response = response.json()
-
+            response = await tiqets_api.variants(ref_prod)
             variants = response['variants']
             for variant in variants:
                 if(len(variant['group_ids']) > 1):
-                    return {'product id': ref_produit}
-
+                    return {'product id': ref_prod}
