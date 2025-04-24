@@ -13,6 +13,7 @@ class CRUD(Generic[ModelType]):
         self.model = model
         self.insert_queue = []
         self.update_queue = []
+        self.delete_queue = []
 
     def create(self, session: Session, **kwargs) -> ModelType:
         obj = self.model(**kwargs) 
@@ -96,6 +97,7 @@ class CRUD(Generic[ModelType]):
         session.commit()
         return 
     
+    
     def delete_all(self, session: Session):
         session.query(self.model).delete()
         session.commit()
@@ -103,9 +105,12 @@ class CRUD(Generic[ModelType]):
     
     def queue_insert(self, session: Session, data: List[ModelType], limit: int = 1000) -> List[ModelType]:
         self.append_insert_queue_list(data)
+        print("INSERT QUEUE", self.insert_queue)
         if len(self.insert_queue) >= limit:
             inserted = self.create_all(session, self.insert_queue)
             self.insert_queue = []
+            for ins in inserted:
+                print(ins)
             return inserted
 
     def queue_update(self, session: Session, mappings: list, limit: int = 1000):
@@ -120,8 +125,16 @@ class CRUD(Generic[ModelType]):
                 .filter(self.model.id.in_(ids)).all()
             )
     
+    def queue_delete(self, session: Session, data: List[ModelType], limit: int = 1000):
+        self.append_delete_queue_list(data)
+        if len(self.delete_queue) >= limit:
+            for obj in self.delete_queue:
+                session.delete(obj)
+            session.commit()
+
     # Misc
     def append_insert_queue_kwargs(self, **kwargs) -> List[ModelType]:
+        print('APPENDED', self.model(**kwargs))
         self.insert_queue.append(self.model(**kwargs))
         return self.insert_queue
     
@@ -136,3 +149,15 @@ class CRUD(Generic[ModelType]):
     def append_update_queue(self, mapping: dict) -> List[ModelType]:
         self.update_queue.append(mapping)
         return self.update_queue
+    
+    def append_delete_queue_kwargs(self, **kwargs) -> List[ModelType]:
+        self.delete_queue.append(self.model(**kwargs))
+        return self.delete_queue
+    
+    def append_delete_queue_model(self, model: ModelType) -> List[ModelType]:
+        self.delete_queue.append(self.model)
+        return self.delete_queue
+    
+    def append_delete_queue_list(self, data: List[ModelType]) -> List[ModelType]:
+        self.delete_queue = self.delete_queue + data
+        return self.delete_queue

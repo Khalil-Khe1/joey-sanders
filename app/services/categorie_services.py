@@ -15,6 +15,7 @@ class CategoryServices(CRUD):
         self.model = Categorie
         self.insert_queue = []
         self.update_queue = []
+        self.delete_queue = []
 
     def queue_from_availability(self, db: Session, product_id: int, available_categories: list):    
         whitelist, update_queue, insert_queue = [], [], []

@@ -16,7 +16,12 @@ async def product(product_id: str, language: str = 'fr', currency: str = 'EUR'):
 
     return await fetch(url, headers=headers, params=params)
 
-async def products(language: str = 'fr', currency: str = 'EUR', page_size: int = 10, page: int = 1):
+async def products(
+    language: str = 'fr', 
+    currency: str = 'EUR', 
+    page_size: int = 10, 
+    page: int = 1, 
+    query: str = ''):
     headers = {
         'Authorization': 'Token OmpSeEXpj5jITovEfjslUzxAx8r7Vt61',
         'User-Agent': 'FastAPI/1.0',
@@ -30,6 +35,9 @@ async def products(language: str = 'fr', currency: str = 'EUR', page_size: int =
         'page': page
     }
     
+    if query != '':
+        params['query'] = query
+
     url = f'https://api.tiqets.com/v2/products'
 
     return await fetch(url, headers=headers, params=params)

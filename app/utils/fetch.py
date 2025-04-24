@@ -14,7 +14,9 @@ async def fetch(url: str, headers: dict, body:dict = {}, params: dict = {}, meth
             response = response.json()
             return response
         except httpx.HTTPStatusError as e:
-            return {'Error': f'{e.response.status_code} - {e.response.text}'}
+            return {
+                'Error': f'{e.response.status_code}',
+                'Message': f'{e.response.text}'}
         except httpx.TimeoutException as e:
             print('Timeout, trying again...')
     return None

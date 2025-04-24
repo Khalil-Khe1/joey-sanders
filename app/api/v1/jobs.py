@@ -37,17 +37,21 @@ async def availability(id_produit: int, ref_prod: str):
     ref_prod = ref_prod.replace(' ', '')
 
     response = await tiqets_api.variants(ref_prod)
+    if 'Error' in response.keys():
+        return {'success': 'false'}
     groups = response['groups']
     variants = response['variants']
 
     response = await tiqets_api.availability(ref_prod)
+    if 'Error' in response.keys():
+        return {'success': 'false'}
     dates = response['dates']
 
     list_tarifs = tarif_utils.tarif_workflow(groups, variants, dates)
     list_categories = tarif_utils.extract_categories(list_tarifs)
     print('AVAILABILITY END', ref_prod)
 
-    return {'id': id_produit, 'categories': list_categories, "tarifs": list_tarifs}
+    return {'success': 'true', 'id': id_produit, 'categories': list_categories, "tarifs": list_tarifs}
 
 @router.get('/availability-all')
 async def availability_all():
@@ -111,7 +115,7 @@ async def create_all_tarifs(db: Session = Depends(get_db)):
     data = []
     for item in data:
         for tarif in item['tarifs']:
-            category_name = f'{tarif["categorie"]} - {tarif["temps"] if tarif["temps"] != "whole_day" else ""}'
+            category_name = f'{tarif["categorie"]}{" - " + tarif["temps"] if tarif["temps"] != "whole_day" else ""}'
             service_categ = CategoryServices()
             category = service_categ.read_kwargs(db, idProduit=item['id'], nomCategorie=category_name)
             if category is None: #Handle not found
@@ -141,11 +145,10 @@ async def create_all_tarifs(db: Session = Depends(get_db)):
 @router.post('/create-all-tarifs/cron')
 async def create_all_tarifs(data: list, db: Session = Depends(get_db)):
     service_tarif = TarifServices()
-
     data = list(filter(lambda e: 'Error' not in e.keys(), data))
     for item in data:
         for tarif in item['tarifs']:
-            category_name = f'{tarif["categorie"]} - {tarif["temps"] if tarif["temps"] != "whole_day" else ""}'
+            category_name = f'{tarif["categorie"]}{" - " + tarif["temps"] if tarif["temps"] != "whole_day" else ""}'
             service_categ = CategoryServices()
             category = service_categ.read_kwargs(db, idProduit=item['id'], nomCategorie=category_name)
             if category is None: #Handle not found

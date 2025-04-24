@@ -12,6 +12,7 @@ class ProductServices(CRUD):
         self.model = Produit
         self.insert_queue = []
         self.update_queue = []
+        self.delete_queue = []
 
     def get_all_nominit(db: Session):
         return (
@@ -56,7 +57,7 @@ class ProductServices(CRUD):
                 if not tiqets_prod:
                     pass # Tiqets API didn't find the product
                 tiqets_prod = tiqets_prod['product']
-                if any(getattr(product, key) != tiqets_prod[key] for key in PRODUCT_COMPARE):
+                if any(getattr(product, key[0]) != tiqets_prod[key[1]] for key in PRODUCT_COMPARE):
                     self.append_update_queue({
                         'id': product.id, 
                         'nomInitial': tiqets_prod['title'], 
