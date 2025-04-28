@@ -142,3 +142,7 @@ async def cron_job(db : Session = Depends(get_db)):
     service_tarif.queue_insert(db, [], 1)
 
     return {'success': 'True'}
+
+@router.get('/test')
+async def test():
+    return {"success": "true"}

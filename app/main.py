@@ -20,3 +20,12 @@ async def print_hello():
     # Cron should ping the corresponding endpoint
     #print("hello")
     return
+
+@app.on_event('startup')
+@repeat_every(minutes=5)
+async def ping_alive():
+    print('Alive')
+
+@app.get("/")
+def root():
+    return {"message": "Minimal test"}
