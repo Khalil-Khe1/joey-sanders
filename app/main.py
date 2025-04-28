@@ -22,7 +22,7 @@ async def print_hello():
     return
 
 @app.on_event('startup')
-@repeat_every(minutes=5)
+@repeat_every(seconds=300)
 async def ping_alive():
     print('Alive')
 
