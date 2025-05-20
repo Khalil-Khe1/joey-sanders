@@ -14,18 +14,6 @@ app.include_router(v1_router, prefix="/api/v1")
 # Cron
 from fastapi_utilities import repeat_every
 
-@app.on_event('startup')
-@repeat_every(seconds=1)
-async def print_hello():
-    # Cron should ping the corresponding endpoint
-    #print("hello")
-    return
-
-@app.on_event('startup')
-@repeat_every(seconds=300)
-async def ping_alive():
-    print('Alive')
-
 @app.get("/")
 def root():
     return {"message": "Minimal test"}

@@ -20,6 +20,7 @@ class CategoryServices(CRUD):
     def queue_from_availability(self, db: Session, product_id: int, available_categories: list):    
         whitelist, update_queue, insert_queue = [], [], []
         list_categ = self.read_all_kwargs(db, product_id=product_id)
+        print('LIST CATEGS', list_categ, available_categories)
         for categ in list_categ:
             if categ.nomCategorie in available_categories:
                 whitelist.append(categ.nomCategorie)

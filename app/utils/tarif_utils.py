@@ -70,7 +70,7 @@ def process_category(variants : list,
     for selected_variant in selected_variants:
         if selected_variant['languages'] not in [['en'], ['fr'], ['en', 'fr'], []]:
             continue
-        if selected_variant['variant_type'].lower() not in ['adult', 'child']:
+        if selected_variant['variant_type'].lower() not in ['adult', 'child', 'regular']:
             continue
 
         selected_price = None
@@ -98,7 +98,7 @@ def process_category(variants : list,
                 }
             current['categorie'] = group_name
 
-        if(selected_variant['variant_type'].lower() == 'adult'):
+        if(selected_variant['variant_type'].lower() in ['adult', 'regular']):
             current['recommande_adulte'] = selected_price['price_mediation']['total_retail_price_incl_vat']
             current['achat_adulte'] = (
                 current['recommande_adulte'] - selected_price['price_mediation']['distributor_commission_excl_vat']

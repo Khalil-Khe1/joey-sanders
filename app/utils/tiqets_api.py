@@ -17,7 +17,9 @@ async def product(product_id: str, language: str = 'fr', currency: str = 'EUR'):
     return await fetch(url, headers=headers, params=params)
 
 async def products(
-    language: str = 'fr', 
+    language: str = 'fr',
+    country: str = '',
+    city: str = '',
     currency: str = 'EUR', 
     page_size: int = 10, 
     page: int = 1, 
@@ -37,7 +39,12 @@ async def products(
     
     if query != '':
         params['query'] = query
+    if country != '':
+        params['country_id'] = country
+    if city != '': 
+        params['city_id'] = city
 
+    print(params)
     url = f'https://api.tiqets.com/v2/products'
 
     return await fetch(url, headers=headers, params=params)

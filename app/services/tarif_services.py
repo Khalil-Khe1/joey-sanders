@@ -16,6 +16,7 @@ class TarifServices(CRUD):
         pass
 
     def queue_from_categories(self, db: Session, categories: list, available_tarifs: list):
+        print(len(categories))
         limit = 10 # Change 10 to 1000
         index = [0, 1]
         insert_queue = []
@@ -23,6 +24,7 @@ class TarifServices(CRUD):
             formatted_name = f'{tarif["categorie"]}{" - " + tarif["temps"] if tarif["temps"] != "whole_day" else ""}'
             for categ in categories:
                 if categ.nomCategorie == formatted_name:
+                #if categ == formatted_name:
                     prices = [
                         [tarif['achat_adulte'], tarif['achat_enfant']], 
                         [tarif['recommande_adulte'], tarif['recommande_enfant']]

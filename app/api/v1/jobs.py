@@ -200,3 +200,43 @@ async def find_group(db: Session = Depends(get_db)):
             for variant in variants:
                 if(len(variant['group_ids']) > 1):
                     return {'product id': ref_prod}
+
+@router.get('/html')
+async def make_html():
+    countries = {}
+    pages = ['1', '2', '3']
+    page = 1
+    ongoing = True
+    for p in pages:
+        res = await client.get(
+            f'https://api.tiqets.com/v2/countries?currency=EUR&lang=fr&page_size=100&page={p}',
+            headers={'authorization': 'Token OmpSeEXpj5jITovEfjslUzxAx8r7Vt61'})
+        res = res.json()
+        for country in res['countries']:
+            countries[country['name']] = {'id': f"country;{country['id']}", 'cities': {}}
+        #countries = countries + res['countries']
+    #countries = sorted(countries, key=lambda x: x['name'])
+    countries = {k: countries[k] for k in sorted(countries)}
+    while ongoing:
+        res = await client.get(
+            f'https://api.tiqets.com/v2/cities?currency=EUR&lang=fr&page_size=100&page={page}',
+            headers={'authorization': 'Token OmpSeEXpj5jITovEfjslUzxAx8r7Vt61'})
+        res = res.json()
+        page = page + 1
+        ongoing = len(res['cities']) == 100
+        for c in res['cities']:
+            if c['country_name'] in countries.keys():
+                countries[c['country_name']]['cities'][c['name']] = f"city;{c['id']}"
+        print(page, len(res['cities']))
+    for c in countries:
+        cities = countries[c]['cities']
+        print(cities)
+        countries[c]['cities'] = {k: cities[k] for k in sorted(cities)}
+    html = ''
+    for c in countries:
+        html = html + f'<option value="{countries[c]["id"]}">{c}</option>\n'
+        cities = countries[c]['cities']
+        for city in cities:
+            html = html + f'<option value="{cities[city]}">&nbsp;&nbsp;{city}</option>\n'
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(html)
